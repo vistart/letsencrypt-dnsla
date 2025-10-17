@@ -13,12 +13,13 @@ IMAGE_BASE="registry.cn-shanghai.aliyuncs.com/vistart_public/mysql"
 CERT_DIR="./certs/db-dev-1-n.rho.im/"
 VOLUME_NAME="mysql_ssl_certs_volume"
 
-# MySQL版本和端口映射
-declare -A MYSQL_VERSIONS
-MYSQL_VERSIONS[8.0]=13680
-MYSQL_VERSIONS[8.4]=13684
-MYSQL_VERSIONS[9.2]=13892
-MYSQL_VERSIONS[latest]=13694
+# MySQL版本和端口映射 (使用普通数组替代关联数组以提高bash兼容性)
+MYSQL_VERSIONS=(
+    "8.0:13680"
+    "8.4:13684"
+    "9.2:13692"
+    "latest:13694"
+)
 
 echo "开始创建MySQL容器..."
 
@@ -29,8 +30,8 @@ if [ ! -d "$CERT_DIR" ]; then
 fi
 
 # 检查证书文件是否存在
-if [ ! -f "$CERT_DIR/cert.pem" ] || [ ! -f "$CERT_DIR/privkey.pem" ] || [ ! -f "$CERT_DIR/chain.pem" ]; then
-    echo "错误: 证书文件缺失。需要 cert.pem, privkey.pem, chain.pem 在 $CERT_DIR 目录中"
+if [ ! -f "$CERT_DIR/cert.pem" ] || [ ! -f "$CERT_DIR/privkey.pem" ] || [ ! -f "$CERT_DIR/chain.pem" ] || [ ! -f "$CERT_DIR/fullchain.pem" ]; then
+    echo "错误: 证书文件缺失。需要 cert.pem, privkey.pem, chain.pem, fullchain.pem 在 $CERT_DIR 目录中"
     echo "当前目录内容:"
     ls -la "$CERT_DIR" || echo "无法列出目录内容"
     exit 1
@@ -40,22 +41,30 @@ fi
 echo "创建SSL证书数据卷: $VOLUME_NAME"
 docker volume create $VOLUME_NAME
 
-# 使用alpine容器复制证书到数据卷
-echo "使用alpine容器复制证书到数据卷..."
+# 使用MySQL容器复制证书到数据卷以确保正确的用户权限
+echo "使用MySQL容器复制证书到数据卷..."
 docker run --rm \
   -v $VOLUME_NAME:/certs_volume \
   -v $(pwd)/$CERT_DIR:/source_certs:ro \
-  registry.cn-shanghai.aliyuncs.com/vistart_public/alpine \
-  sh -c "cp /source_certs/* /certs_volume/ && chmod -R 400 /certs_volume/* && ls -la /certs_volume/"
+  --user root \
+  $IMAGE_BASE:latest \
+  sh -c "cp /source_certs/fullchain.pem /certs_volume/fullchain.pem && \
+         cp /source_certs/cert.pem /certs_volume/cert.pem && \
+         cp /source_certs/privkey.pem /certs_volume/privkey.pem && \
+         chmod 644 /certs_volume/fullchain.pem /certs_volume/cert.pem 2>/dev/null || echo 'Warning: Could not set permissions on certificate files' && \
+         chmod 600 /certs_volume/privkey.pem 2>/dev/null || echo 'Warning: Could not set permissions on private key file' && \
+         chmod -R 755 /certs_volume/ 2>/dev/null || echo 'Warning: Could not set permissions on volume directory' && \
+         ls -la /certs_volume/"
 
 # 循环创建MySQL容器
-for version in "${!MYSQL_VERSIONS[@]}"; do
-    port=${MYSQL_VERSIONS[$version]}
+for item in "${MYSQL_VERSIONS[@]}"; do
+    version=$(echo "$item" | cut -d':' -f1)
+    port=$(echo "$item" | cut -d':' -f2)
     container_name="mysql_${version//./_}"  # 将版本号中的点替换为下划线
     
     echo "创建MySQL $version 容器，端口映射: 3306->$port"
     
-    docker run -d \
+    docker run -d -it \
       --name $container_name \
       -e MYSQL_ROOT_PASSWORD=password \
       -e MYSQL_DATABASE=test_db \
@@ -63,7 +72,7 @@ for version in "${!MYSQL_VERSIONS[@]}"; do
       -p $port:3306 \
       -v $VOLUME_NAME:/ssl_certs:ro \
       $IMAGE_BASE:$version \
-      --ssl-ca=/ssl_certs/chain.pem \
+      --ssl-ca=/ssl_certs/fullchain.pem \
       --ssl-cert=/ssl_certs/cert.pem \
       --ssl-key=/ssl_certs/privkey.pem \
       --require-secure-transport=ON

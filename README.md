@@ -308,6 +308,8 @@ sudo systemctl reload apache2
 
 ### MySQL/MariaDB
 
+服务器端配置：
+
 ```ini
 [mysqld]
 ssl-ca=/path/to/certs/example.com/chain.pem
@@ -316,7 +318,30 @@ ssl-key=/path/to/certs/example.com/privkey.pem
 require_secure_transport=ON
 ```
 
+客户端连接（使用证书验证）：
+
+```bash
+mysql --host=example.com --port=3306 --user=username --password \
+  --ssl-mode=VERIFY_IDENTITY \
+  --ssl-ca=/path/to/certs/example.com/chain.pem \
+  --ssl-cert=/path/to/certs/example.com/cert.pem \
+  --ssl-key=/path/to/certs/example.com/privkey.pem \
+  database_name
+```
+
+或者使用配置文件 `~/.my.cnf`：
+
+```ini
+[client]
+ssl-ca=/path/to/certs/example.com/chain.pem
+ssl-cert=/path/to/certs/example.com/cert.pem
+ssl-key=/path/to/certs/example.com/privkey.pem
+ssl-mode=VERIFY_IDENTITY
+```
+
 ### PostgreSQL
+
+服务器端配置：
 
 ```ini
 ssl = on
@@ -331,7 +356,25 @@ chown postgres:postgres /path/to/certs/example.com/privkey.pem
 chmod 600 /path/to/certs/example.com/privkey.pem
 ```
 
+客户端连接（使用证书验证）：
+
+```bash
+psql "host=example.com port=5432 dbname=database_name user=username sslmode=verify-full sslcert=/path/to/certs/example.com/cert.pem sslkey=/path/to/certs/example.com/privkey.pem sslrootcert=/path/to/certs/example.com/chain.pem"
+```
+
+或设置环境变量：
+
+```bash
+export PGSSLMODE=verify-full
+export PGSSLROOTCERT=/path/to/certs/example.com/chain.pem
+export PGSSLCERT=/path/to/certs/example.com/cert.pem
+export PGSSLKEY=/path/to/certs/example.com/privkey.pem
+psql -h example.com -p 5432 -U username -d database_name
+```
+
 ### MongoDB
+
+服务器端配置：
 
 编辑 `mongod.conf`：
 
@@ -350,7 +393,20 @@ chmod 600 certs/example.com/fullchain-with-key.pem
 chown mongodb:mongodb certs/example.com/fullchain-with-key.pem
 ```
 
+客户端连接（使用证书验证）：
+
+```bash
+mongosh --host example.com --port 27017 \
+  --ssl --sslCAFile /path/to/certs/example.com/chain.pem \
+  --sslPEMKeyFile /path/to/certs/example.com/fullchain-with-key.pem \
+  --sslAllowInvalidCertificates false \
+  --sslAllowInvalidHostnames false \
+  mongodb://username@localhost:27017/database_name
+```
+
 ### Redis
+
+服务器端配置：
 
 编辑 `redis.conf`：
 
@@ -360,6 +416,16 @@ port 0
 tls-cert-file /path/to/certs/example.com/cert.pem
 tls-key-file /path/to/certs/example.com/privkey.pem
 tls-ca-cert-file /path/to/certs/example.com/chain.pem
+```
+
+客户端连接（使用证书验证）：
+
+```bash
+redis-cli -h example.com -p 6380 \
+  --tls \
+  --cacert /path/to/certs/example.com/chain.pem \
+  --cert /path/to/certs/example.com/cert.pem \
+  --key /path/to/certs/example.com/privkey.pem
 ```
 
 ## 自动续期

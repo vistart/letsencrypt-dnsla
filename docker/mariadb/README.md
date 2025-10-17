@@ -2,6 +2,13 @@
 
 此目录包含用于批量管理MariaDB容器的脚本。
 
+## 特性
+
+- 与旧版本bash兼容（不使用关联数组）
+- 支持SSL证书配置
+- 统一的权限管理
+- 版本兼容性处理
+
 ## 功能
 
 - 批量创建多个版本的MariaDB容器
@@ -81,3 +88,26 @@
 - 13710: MariaDB 11.8
 - 13711: MariaDB 12.0
 - 13712: MariaDB latest (12.1)
+
+## 经验总结
+
+### 版本兼容性处理
+- MariaDB 10.5及更早版本（包括10.10, 10.11等）不支持require_secure_transport参数
+- 对这些版本在启动时不使用require_secure_transport参数
+- 对10.6及更新版本启用require_secure_transport=ON强制SSL传输
+
+### 证书权限管理
+- 使用MariaDB容器作为跳板复制证书，确保正确的用户权限
+- 证书文件在数据卷中重命名为：server-cert.pem, server-key.pem, ca.pem
+- 使用chown 999:999设置正确的容器内部用户权限
+- 私钥文件设置为600权限，证书文件设置为644权限
+
+### SSL配置
+- 使用fullchain.pem作为服务器证书，chain.pem作为CA证书，privkey.pem作为私钥
+- 使用--ssl-ca, --ssl-cert, --ssl-key参数配置SSL
+- 客户端连接时需使用--ssl-mode=REQUIRED或更高级别
+
+### 连接验证
+- 提供了Python验证脚本 `verify_ssl_connection.py` 
+- 由于macOS兼容性问题，脚本仅提供代码结构，不执行实际验证
+- 脚本包含连接参数和代码示例供参考

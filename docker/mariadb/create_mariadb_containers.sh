@@ -39,8 +39,8 @@ if [ ! -d "$CERT_DIR" ]; then
 fi
 
 # 检查证书文件是否存在
-if [ ! -f "$CERT_DIR/cert.pem" ] || [ ! -f "$CERT_DIR/privkey.pem" ] || [ ! -f "$CERT_DIR/chain.pem" ]; then
-    echo "错误: 证书文件缺失。需要 cert.pem, privkey.pem, chain.pem 在 $CERT_DIR 目录中"
+if [ ! -f "$CERT_DIR/cert.pem" ] || [ ! -f "$CERT_DIR/privkey.pem" ] || [ ! -f "$CERT_DIR/chain.pem" ] || [ ! -f "$CERT_DIR/fullchain.pem" ]; then
+    echo "错误: 证书文件缺失。需要 cert.pem, privkey.pem, chain.pem, fullchain.pem 在 $CERT_DIR 目录中"
     echo "当前目录内容:"
     ls -la "$CERT_DIR" || echo "无法列出目录内容"
     exit 1
@@ -50,13 +50,20 @@ fi
 echo "创建SSL证书数据卷: $VOLUME_NAME"
 docker volume create $VOLUME_NAME
 
-# 使用alpine容器复制证书到数据卷
-echo "使用alpine容器复制证书到数据卷..."
+# 使用MariaDB容器复制证书到数据卷以确保正确的用户权限
+echo "使用MariaDB容器复制证书到数据卷..."
 docker run --rm \
   -v $VOLUME_NAME:/certs_volume \
   -v $(pwd)/$CERT_DIR:/source_certs:ro \
-  registry.cn-shanghai.aliyuncs.com/vistart_public/alpine \
-  sh -c "cp /source_certs/* /certs_volume/ && chmod -R 400 /certs_volume/* && ls -la /certs_volume/"
+  --user root \
+  $IMAGE_BASE:latest \
+  sh -c "cp /source_certs/fullchain.pem /certs_volume/fullchain.pem && \
+         cp /source_certs/cert.pem /certs_volume/cert.pem && \
+         cp /source_certs/privkey.pem /certs_volume/privkey.pem && \
+         chmod 644 /certs_volume/fullchain.pem /certs_volume/cert.pem 2>/dev/null || echo 'Warning: Could not set permissions on certificate files' && \
+         chmod 600 /certs_volume/privkey.pem 2>/dev/null || echo 'Warning: Could not set permissions on private key file' && \
+         chmod -R 755 /certs_volume/ 2>/dev/null || echo 'Warning: Could not set permissions on volume directory' && \
+         ls -la /certs_volume/"
 
 # 循环创建MariaDB容器
 for item in "${MARIADB_VERSIONS[@]}"; do
@@ -66,18 +73,35 @@ for item in "${MARIADB_VERSIONS[@]}"; do
     
     echo "创建MariaDB $version 容器，端口映射: 3306->$port"
     
-    docker run -d \
-      --name $container_name \
-      -e MYSQL_ROOT_PASSWORD=password \
-      -e MYSQL_DATABASE=test_db \
-      -e TZ=Asia/Shanghai \
-      -p $port:3306 \
-      -v $VOLUME_NAME:/ssl_certs:ro \
-      $IMAGE_BASE:$version \
-      --ssl-ca=/ssl_certs/chain.pem \
-      --ssl-cert=/ssl_certs/cert.pem \
-      --ssl-key=/ssl_certs/privkey.pem \
-      --require-secure-transport=ON
+    # MariaDB 10.5及更早版本不支持require_secure_transport参数
+    if [[ "$version" =~ ^(10\.[0-5]|10\.1[0-1])$ ]]; then
+        # 不包含 require_secure_transport 参数
+        docker run -d -it \
+          --name $container_name \
+          -e MYSQL_ROOT_PASSWORD=password \
+          -e MYSQL_DATABASE=test_db \
+          -e TZ=Asia/Shanghai \
+          -p $port:3306 \
+          -v $VOLUME_NAME:/ssl_certs:ro \
+          $IMAGE_BASE:$version \
+          --ssl-ca=/ssl_certs/fullchain.pem \
+          --ssl-cert=/ssl_certs/cert.pem \
+          --ssl-key=/ssl_certs/privkey.pem
+    else
+        # 包含 require_secure_transport 参数
+        docker run -d -it \
+          --name $container_name \
+          -e MYSQL_ROOT_PASSWORD=password \
+          -e MYSQL_DATABASE=test_db \
+          -e TZ=Asia/Shanghai \
+          -p $port:3306 \
+          -v $VOLUME_NAME:/ssl_certs:ro \
+          $IMAGE_BASE:$version \
+          --ssl-ca=/ssl_certs/fullchain.pem \
+          --ssl-cert=/ssl_certs/cert.pem \
+          --ssl-key=/ssl_certs/privkey.pem \
+          --require-secure-transport=ON
+    fi
     
     echo "MariaDB $version 容器已启动，名称: $container_name，端口: $port"
 done

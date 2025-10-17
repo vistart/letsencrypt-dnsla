@@ -2,6 +2,12 @@
 
 此目录包含用于批量管理MySQL容器的脚本。
 
+## 特性
+
+- 与旧版本bash兼容（不使用关联数组）
+- 支持SSL证书配置
+- 统一的权限管理
+
 ## 功能
 
 - 批量创建多个版本的MySQL容器
@@ -61,5 +67,23 @@
 
 - 13680: MySQL 8.0
 - 13684: MySQL 8.4
-- 13892: MySQL 9.2
+- 13692: MySQL 9.2
 - 13694: MySQL latest
+
+## 经验总结
+
+### 证书权限管理
+- 使用MySQL容器本身作为跳板复制证书，确保正确的用户权限
+- 证书文件在数据卷中重命名为：server-cert.pem, server-key.pem, ca.pem
+- 使用chown 999:999设置正确的容器内部用户权限
+- 私钥文件设置为600权限，证书文件设置为644权限
+
+### SSL配置
+- 所有MySQL版本均启用SSL连接
+- 使用fullchain.pem作为服务器证书，chain.pem作为CA证书，privkey.pem作为私钥
+- 强制使用安全传输（require_secure_transport=ON）
+- 客户端连接时需使用ssl-mode=REQUIRED或更高级别
+
+### 连接验证
+- 提供了Python验证脚本 `verify_ssl_connection.py` 用于测试SSL连接
+- 脚本会测试所有版本的MySQL容器的SSL连接

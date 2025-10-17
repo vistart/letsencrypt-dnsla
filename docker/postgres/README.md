@@ -2,6 +2,12 @@
 
 此目录包含用于批量管理PostgreSQL容器的脚本。
 
+## 特性
+
+- 与旧版本bash兼容（不使用关联数组）
+- 支持SSL证书配置
+- 统一的权限管理
+
 ## 功能
 
 - 批量创建多个版本的PostgreSQL容器
@@ -28,7 +34,7 @@
 
 1. 检查证书文件是否存在
 2. 创建名为 `postgres_ssl_certs_volume` 的Docker数据卷
-3. 使用 `registry.cn-shanghai.aliyuncs.com/vistart_public/alpine` 容器将证书复制到数据卷，并按PostgreSQL要求重命名：
+3. 使用 `registry.cn-shanghai.aliyuncs.com/vistart_public/postgres` 容器将证书复制到数据卷，并按PostgreSQL要求重命名，同时设置正确的用户权限：
    - `cert.pem` -> `server.crt`
    - `privkey.pem` -> `server.key`
    - `chain.pem` -> `root.crt`
@@ -81,3 +87,21 @@
 - 15439: PostgreSQL 16
 - 15440: PostgreSQL 17
 - 15441: PostgreSQL latest (18)
+
+## 经验总结
+
+### 证书权限管理
+- 使用PostgreSQL容器作为跳板复制证书，确保正确的用户权限
+- 证书文件在数据卷中重命名为：server.crt, server.key, root.crt（符合PostgreSQL标准）
+- 使用chown 999:999设置正确的容器内部用户权限（PostgreSQL默认用户ID）
+- 私钥文件设置为600权限，证书文件设置为644权限
+- 如果遇到Permission denied错误，确保私钥文件权限正确且由PostgreSQL用户拥有
+
+### SSL配置
+- 启用SSL支持（ssl=on）
+- 配置ssl_cert_file、ssl_key_file和ssl_ca_file参数
+- 可通过PostgreSQL客户端使用verify-full模式验证服务器证书
+
+### 连接验证
+- 提供了Python验证脚本 `verify_ssl_connection.py` 用于测试SSL连接
+- 脚本会测试所有版本的PostgreSQL容器的SSL连接

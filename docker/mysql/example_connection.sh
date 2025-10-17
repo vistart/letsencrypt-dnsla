@@ -5,7 +5,7 @@
 echo "MySQL容器信息："
 echo "1. MySQL 8.0: localhost:13680"
 echo "2. MySQL 8.4: localhost:13684" 
-echo "3. MySQL 9.2: localhost:13892"
+echo "3. MySQL 9.2: localhost:13692"
 echo "4. MySQL latest: localhost:13694"
 echo ""
 echo "连接示例（使用SSL）："
