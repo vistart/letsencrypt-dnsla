@@ -161,57 +161,35 @@ class ACMEClient:
 
         return acme_client
 
-    def create_order(self, domains: List[str]) -> Tuple[messages.OrderResource, List[challenges.DNS01]]:
-        """
-        创建证书订单并获取DNS-01挑战
-
-        Args:
-            domains: 域名列表
-
-        Returns:
-            订单资源和DNS-01挑战列表
-        """
-        logger.info(f"为域名创建订单: {', '.join(domains)}")
-
-        # 创建订单
-        order = self.acme_client.new_order(
-            [acme_crypto.make_csr(domain.encode(), [domain.encode()]) for domain in domains]
-        )
-
-        # 提取DNS-01挑战
-        dns_challenges = []
-        for authz in order.authorizations:
-            for challenge in authz.body.challenges:
-                if isinstance(challenge.chall, challenges.DNS01):
-                    dns_challenges.append(challenge)
-
-        logger.info(f"获取到 {len(dns_challenges)} 个DNS-01挑战")
-        return order, dns_challenges
-
-    def get_dns_challenge_data(self, challenge) -> Tuple[str, str, str]:
+    def get_dns_challenge_data(
+        self, 
+        authz: messages.AuthorizationResource,
+        challenge: messages.ChallengeBody
+    ) -> Tuple[str, str, str]:
         """
         获取DNS挑战数据
 
         Args:
+            authz: 授权资源
             challenge: DNS-01挑战
 
         Returns:
             (域名, 记录名, 记录值) 元组
         """
-        domain = challenge.authz.body.identifier.value
+        # 从授权中获取域名
+        domain = authz.body.identifier.value
 
         # 获取验证记录名
         validation_domain_name = challenge.chall.validation_domain_name(domain)
 
         # 获取验证记录值
-        key_authorization = challenge.chall.key_authorization(self.account_key)
         validation = challenge.chall.validation(self.account_key)
 
         logger.debug(f"DNS挑战数据: {validation_domain_name} -> {validation}")
 
         return domain, validation_domain_name, validation
 
-    def answer_challenge(self, challenge) -> bool:
+    def answer_challenge(self, challenge: messages.ChallengeBody) -> bool:
         """
         回答挑战(告诉Let's Encrypt已经设置好DNS记录)
 
