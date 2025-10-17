@@ -6,8 +6,6 @@ MySQL SSL连接验证脚本
 注意：在运行此脚本前，请确保：
 1. MySQL容器已启动并运行
 2. 从主机可以访问指定的IP和端口
-3. 证书文件存在且有效
-4. 证书域名与连接目标匹配（如果使用verify-full模式）
 """
 
 import mysql.connector
@@ -15,8 +13,7 @@ import sys
 import os
 from pathlib import Path
 
-# MySQL服务器配置
-MYSQL_HOST = '192.168.1.3'
+# MySQL服务器端口配置
 MYSQL_PORTS = {
     '8.0': 13680,
     '8.4': 13684,
@@ -24,28 +21,21 @@ MYSQL_PORTS = {
     'latest': 13694
 }
 
-# 证书文件路径
-CERT_DIR = Path('../../certs/db-dev-1-n.rho.im')
-CA_CERT_PATH = str(CERT_DIR / 'chain.pem')
-CLIENT_CERT_PATH = str(CERT_DIR / 'cert.pem')
-CLIENT_KEY_PATH = str(CERT_DIR / 'privkey.pem')
-
-def verify_mysql_ssl_connection(port, version):
+def verify_mysql_ssl_connection(host, port, version):
     """验证MySQL SSL连接"""
     try:
-        print(f"正在连接到 MySQL {version} (端口 {port})...")
+        print(f"正在连接到 MySQL {version} ({host}:{port})...")
         
         # 连接参数
-        # 根据Let's Encrypt证书特点，我们配置基本的SSL连接
+        # 由于证书由受信任根签发，不需要提供证书文件，只需启用SSL连接
         conn_params = {
-            'host': MYSQL_HOST,
+            'host': host,
             'port': port,
             'user': 'root',
             'password': 'password',
             'database': 'test_db',
-            'ssl_ca': CA_CERT_PATH,        # Let's Encrypt中间证书用于验证服务器
-            'ssl_verify_cert': False,      # Let's Encrypt证书通常验证域名，而我们使用IP连接
-            'ssl_disabled': False,
+            'ssl_disabled': False,          # 启用SSL
+            'connection_timeout': 10        # 设置连接超时
         }
         
         # 尝试连接
@@ -55,7 +45,7 @@ def verify_mysql_ssl_connection(port, version):
         cursor = conn.cursor()
         cursor.execute('SELECT VERSION();')
         result = cursor.fetchone()
-        print(f"✓ 成功连接到 MySQL {version} (端口 {port})")
+        print(f"✓ 成功连接到 MySQL {version} ({host}:{port})")
         print(f"  服务器版本: {result[0]}")
         
         # 检查连接是否使用SSL
@@ -74,24 +64,23 @@ def verify_mysql_ssl_connection(port, version):
         return True
         
     except Exception as e:
-        print(f"✗ 连接到 MySQL {version} (端口 {port}) 失败: {e}")
+        print(f"✗ 连接到 MySQL {version} ({host}:{port}) 失败: {e}")
         return False
 
 def main():
+    # 从命令行参数获取主机地址，如果没有提供则使用localhost
+    if len(sys.argv) != 2:
+        host = "127.0.0.1"  # 默认主机地址
+        print("用法: python verify_ssl_connection.py <host>")
+        print(f"例如: python verify_ssl_connection.py db-dev-1-n.rho.im")
+        print(f"使用默认主机: {host}")
+    else:
+        host = sys.argv[1]
+    
     print("MySQL SSL连接验证")
     print("=" * 50)
-    print(f"主机: {MYSQL_HOST}")
-    print(f"证书目录: {CERT_DIR}")
+    print(f"主机: {host}")
     print()
-    
-    # 验证证书文件存在
-    if not CERT_DIR.exists():
-        print(f"错误: 证书目录不存在: {CERT_DIR}")
-        return False
-    
-    if not all(Path(p).exists() for p in [CA_CERT_PATH, CLIENT_CERT_PATH, CLIENT_KEY_PATH]):
-        print(f"错误: 证书文件不存在")
-        return False
     
     print("开始验证各版本MySQL连接...")
     print()
@@ -100,7 +89,7 @@ def main():
     total_connections = len(MYSQL_PORTS)
     
     for version, port in MYSQL_PORTS.items():
-        if verify_mysql_ssl_connection(port, version):
+        if verify_mysql_ssl_connection(host, port, version):
             successful_connections += 1
         print()
     

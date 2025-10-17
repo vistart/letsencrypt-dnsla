@@ -6,8 +6,6 @@ PostgreSQL SSL连接验证脚本
 注意：在运行此脚本前，请确保：
 1. PostgreSQL容器已启动并运行
 2. 从主机可以访问指定的IP和端口
-3. 证书文件存在且有效
-4. 证书域名与连接目标匹配（如果使用verify-full模式）
 """
 
 import psycopg
@@ -16,8 +14,7 @@ import sys
 import os
 from pathlib import Path
 
-# PostgreSQL服务器配置
-PG_HOST = '192.168.1.3'
+# PostgreSQL服务器端口配置
 PG_PORTS = {
     9: 15432,
     10: 15433,
@@ -31,31 +28,20 @@ PG_PORTS = {
     'latest': 15441  # 对应PostgreSQL 18
 }
 
-# 证书文件路径
-# 请注意：在创建容器时，证书文件被复制到数据卷并重命名为
-# server.crt (来自 fullchain.pem), server.key (来自 privkey.pem), root.crt (来自 chain.pem)
-# 这些文件位于数据卷中，客户端连接需要从本地获取原始证书文件
-CERT_DIR = Path('../../certs/db-dev-1-n.rho.im')
-CA_CERT_PATH = str(CERT_DIR / 'chain.pem')
-CLIENT_CERT_PATH = str(CERT_DIR / 'cert.pem')
-CLIENT_KEY_PATH = str(CERT_DIR / 'privkey.pem')
-
-def verify_postgres_ssl_connection(port, version):
+def verify_postgres_ssl_connection(host, port, version):
     """验证PostgreSQL SSL连接"""
     try:
-        print(f"正在连接到 PostgreSQL {version} (端口 {port})...")
+        print(f"正在连接到 PostgreSQL {version} ({host}:{port})...")
         
         # 连接参数
-        # 根据Let's Encrypt证书特点，使用require模式进行SSL连接
-        # 由于我们使用IP而非域名连接，避免使用verify-full模式
+        # 由于证书由受信任根签发，不需要提供证书文件，只需启用SSL连接
         conn_params = {
-            'host': PG_HOST,
+            'host': host,
             'port': port,
-            'user': 'postgres',
+            'user': 'root',
             'password': 'password',
             'dbname': 'test_db',
-            'sslmode': 'require',      # 只要求SSL连接，不验证证书
-            'sslrootcert': CA_CERT_PATH,    # CA证书路径
+            'sslmode': 'require',    # 只需要SSL连接，不需要验证证书
         }
         
         # 尝试连接
@@ -64,35 +50,45 @@ def verify_postgres_ssl_connection(port, version):
                 # 执行简单查询验证连接
                 cur.execute('SELECT version();')
                 result = cur.fetchone()
-                print(f"✓ 成功连接到 PostgreSQL {version} (端口 {port})")
+                print(f"✓ 成功连接到 PostgreSQL {version} ({host}:{port})")
                 print(f"  服务器版本: {result[0][:50]}...")
                 
-                # 检查连接是否使用SSL
-                cur.execute("SELECT ssl_is_used();")
-                ssl_used = cur.fetchone()[0]
-                print(f"  SSL连接状态: {'是' if ssl_used else '否'}")
+                # 检查连接是否使用SSL (PostgreSQL使用不同的函数)
+                cur.execute("SELECT count(*) > 0 FROM pg_stat_ssl WHERE ssl = true AND pid = pg_backend_pid();")
+                ssl_query_result = cur.fetchone()
+                if ssl_query_result:
+                    ssl_used = ssl_query_result[0] or False
+                    print(f"  SSL连接状态: {'是' if ssl_used else '否'}")
+                else:
+                    # 如果查询失败，尝试另一种方法
+                    try:
+                        cur.execute("SELECT ssl, count(*) FROM pg_stat_ssl GROUP BY ssl;")
+                        ssl_status = cur.fetchall()
+                        ssl_used = any(row[0] for row in ssl_status)
+                        print(f"  SSL连接状态: {'是' if ssl_used else '否'}")
+                    except:
+                        print("  SSL连接状态: 无法确定")
                 
         return True
         
     except Exception as e:
-        print(f"✗ 连接到 PostgreSQL {version} (端口 {port}) 失败: {e}")
+        print(f"✗ 连接到 PostgreSQL {version} ({host}:{port}) 失败: {e}")
         return False
 
 def main():
+    # 从命令行参数获取主机地址，如果没有提供则使用默认值
+    if len(sys.argv) != 2:
+        host = "127.0.0.1"  # 默认主机地址
+        print("用法: python verify_ssl_connection.py <host>")
+        print(f"例如: python verify_ssl_connection.py db-dev-1-n.rho.im")
+        print(f"使用默认主机: {host}")
+    else:
+        host = sys.argv[1]
+    
     print("PostgreSQL SSL连接验证")
     print("=" * 50)
-    print(f"主机: {PG_HOST}")
-    print(f"证书目录: {CERT_DIR}")
+    print(f"主机: {host}")
     print()
-    
-    # 验证证书文件存在
-    if not CERT_DIR.exists():
-        print(f"错误: 证书目录不存在: {CERT_DIR}")
-        return False
-    
-    if not all(Path(p).exists() for p in [CA_CERT_PATH, CLIENT_CERT_PATH, CLIENT_KEY_PATH]):
-        print(f"错误: 证书文件不存在")
-        return False
     
     print("开始验证各版本PostgreSQL连接...")
     print()
@@ -101,7 +97,7 @@ def main():
     total_connections = len(PG_PORTS)
     
     for version, port in PG_PORTS.items():
-        if verify_postgres_ssl_connection(port, version):
+        if verify_postgres_ssl_connection(host, port, version):
             successful_connections += 1
         print()
     
