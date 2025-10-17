@@ -17,8 +17,6 @@ from pathlib import Path
 # MariaDB服务器配置
 MARIADB_HOST = '192.168.1.3'
 MARIADB_PORTS = {
-    '10.0': 13700,
-    '10.1': 13701,
     '10.2': 13702,
     '10.3': 13703,
     '10.4': 13704,

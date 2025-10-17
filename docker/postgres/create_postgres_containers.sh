@@ -75,6 +75,7 @@ for item in "${POSTGRES_VERSIONS[@]}"; do
       --name $container_name \
       -e POSTGRES_PASSWORD=password \
       -e POSTGRES_DB=test_db \
+      -e POSTGRES_USER=root \
       -e TZ=Asia/Shanghai \
       -p $port:5432 \
       -v $VOLUME_NAME:/var/lib/postgresql/certs:ro \

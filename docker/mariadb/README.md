@@ -37,8 +37,6 @@
 2. 创建名为 `mariadb_ssl_certs_volume` 的Docker数据卷
 3. 使用 `registry.cn-shanghai.aliyuncs.com/vistart_public/alpine` 容器将证书复制到数据卷
 4. 创建以下MariaDB容器：
-   - MariaDB 10.0，端口映射 3306->13700
-   - MariaDB 10.1，端口映射 3306->13701
    - MariaDB 10.2，端口映射 3306->13702
    - MariaDB 10.3，端口映射 3306->13703
    - MariaDB 10.4，端口映射 3306->13704

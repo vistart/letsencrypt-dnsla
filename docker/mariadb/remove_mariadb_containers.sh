@@ -12,8 +12,8 @@ echo "开始移除MariaDB容器..."
 
 # 停止并移除MariaDB容器
 echo "停止并移除MariaDB容器..."
-docker stop mariadb_10_0 mariadb_10_1 mariadb_10_2 mariadb_10_3 mariadb_10_4 mariadb_10_5 mariadb_10_6 mariadb_10_11 mariadb_11_4 mariadb_11_7 mariadb_11_8 mariadb_12_0 mariadb_latest 2>/dev/null || true
-docker rm mariadb_10_0 mariadb_10_1 mariadb_10_2 mariadb_10_3 mariadb_10_4 mariadb_10_5 mariadb_10_6 mariadb_10_11 mariadb_11_4 mariadb_11_7 mariadb_11_8 mariadb_12_0 mariadb_latest 2>/dev/null || true
+docker stop mariadb_10_2 mariadb_10_3 mariadb_10_4 mariadb_10_5 mariadb_10_6 mariadb_10_11 mariadb_11_4 mariadb_11_7 mariadb_11_8 mariadb_12_0 mariadb_latest 2>/dev/null || true
+docker rm mariadb_10_2 mariadb_10_3 mariadb_10_4 mariadb_10_5 mariadb_10_6 mariadb_10_11 mariadb_11_4 mariadb_11_7 mariadb_11_8 mariadb_12_0 mariadb_latest 2>/dev/null || true
 
 # 移除数据卷
 echo "移除SSL证书数据卷: $VOLUME_NAME"

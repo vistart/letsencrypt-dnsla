@@ -13,10 +13,8 @@ IMAGE_BASE="registry.cn-shanghai.aliyuncs.com/vistart_public/mariadb"
 CERT_DIR="./certs/db-dev-1-n.rho.im/"
 VOLUME_NAME="mariadb_ssl_certs_volume"
 
-# MariaDB版本和端口映射 (从13700开始)
+# MariaDB版本和端口映射 (从13702开始，跳过10.0和10.1)
 MARIADB_VERSIONS=(
-    "10.0:13700"
-    "10.1:13701"
     "10.2:13702"
     "10.3:13703"
     "10.4:13704"
