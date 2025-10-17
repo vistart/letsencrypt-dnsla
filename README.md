@@ -437,14 +437,16 @@ pip install -r requirements.txt --upgrade
 
 3. **使用测试环境**：首次使用时启用 `staging: true`
 
-4. **定期更新**：保持依赖包更新
+4. **敏感操作保护**：如果在 console.dns.la 中开启了"敏感操作"保护，则除了查询操作外，所有对域名的修改操作（如添加、修改、删除DNS记录）都会被直接拒绝，这将导致证书颁发、续期、吊销等功能失败，因为这些操作需要对DNS记录进行修改。
+
+5. **定期更新**：保持依赖包更新
    ```bash
    pip install -r requirements.txt --upgrade
    ```
 
-5. **监控证书**：设置证书到期提醒
+6. **监控证书**：设置证书到期提醒
 
-6. **备份证书**：定期备份 `certs/` 和 `accounts/` 目录
+7. **备份证书**：定期备份 `certs/` 和 `accounts/` 目录
 
 ## Let's Encrypt 限制
 
