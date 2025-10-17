@@ -229,6 +229,8 @@ class DNSLAClient:
         """
         修改DNS记录状态
         
+        注意：更新DNS记录可能存在较长时延，如果需要快速生效，请使用'删除记录-添加记录'方式。
+        
         Args:
             record_id: 记录ID
             disable: 是否禁用
