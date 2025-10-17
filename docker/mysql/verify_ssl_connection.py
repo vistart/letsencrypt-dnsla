@@ -58,6 +58,38 @@ def verify_mysql_ssl_connection(host, port, version):
         ssl_status = cursor.fetchone()
         print(f"  SSL状态: {ssl_status[1] if ssl_status[1] else '未使用SSL'}")
         
+        # 执行简单查询测试
+        cursor.execute("SELECT NOW();")
+        current_time = cursor.fetchone()
+        print(f"  当前时间: {current_time[0]}")
+        
+        # 查询时区信息
+        cursor.execute("SELECT @@session.time_zone, NOW(), UTC_TIMESTAMP();")
+        timezone_info = cursor.fetchone()
+        session_timezone = timezone_info[0] if timezone_info[0] else '未设置'
+        local_time = timezone_info[1]
+        utc_time = timezone_info[2]
+        
+        print(f"  会话时区: {session_timezone}")
+        print(f"  本地时间: {local_time}")
+        print(f"  UTC时间: {utc_time}")
+        
+        # 计算时区偏移（如果可能）
+        try:
+            from datetime import datetime
+            # 如果是SYSTEM时区，尝试获取实际偏移
+            if session_timezone == 'SYSTEM':
+                # 通过时间差计算偏移
+                import time
+                local_offset = -time.timezone / 3600  # 转换为小时
+                if time.daylight and time.localtime().tm_isdst:
+                    local_offset = -time.altzone / 3600
+                print(f"  时区偏移: UTC{local_offset:+.2f}h")
+            else:
+                print(f"  时区偏移: {session_timezone}")
+        except:
+            print(f"  时区偏移: 无法计算")
+        
         cursor.close()
         conn.close()
         

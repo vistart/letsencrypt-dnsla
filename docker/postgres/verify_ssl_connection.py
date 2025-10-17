@@ -69,6 +69,11 @@ def verify_postgres_ssl_connection(host, port, version):
                     except:
                         print("  SSL连接状态: 无法确定")
                 
+                # 执行简单查询测试
+                cur.execute("SELECT NOW();")
+                current_time = cur.fetchone()
+                print(f"  当前时间: {current_time[0]}")
+                
         return True
         
     except Exception as e:
